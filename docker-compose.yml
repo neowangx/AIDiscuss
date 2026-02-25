@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: aidiscuss
+    restart: unless-stopped
+    ports:
+      - "3088:3000"
+    volumes:
+      - aidiscuss-data:/app/data
+    environment:
+      - DATABASE_URL=file:./data/prod.db
+      - NODE_ENV=production
+
+volumes:
+  aidiscuss-data:

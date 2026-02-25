@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  accessCode  String   @unique
+  isAdmin     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  discussions Discussion[]
+}
+
+model Discussion {
+  id              String   @id @default(uuid())
+  title           String
+  topic           String
+  frameworkId      String?
+  userId          String?
+  mode            String   @default("spectator") // spectator | moderator | boss_checkin
+  status          String   @default("created") // created | running | paused | completed | checkpoint
+  currentPhase    Int      @default(0)
+  currentRound    Int      @default(0)
+  summary         String?
+  frameworkHistory String?  // JSON: [{ frameworkId, switchedAt, reason }]
+  rating          Int?     // 1-5 star rating
+  feedback        String?  // user feedback text
+  shareToken      String?  @unique // public share token
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user        User?       @relation(fields: [userId], references: [id])
+  roles       DiscussionRole[]
+  messages    Message[]
+  rounds      Round[]
+  framework   Framework?  @relation(fields: [frameworkId], references: [id])
+  auditLogs   AuditLog[]
+
+  @@index([userId])
+}
+
+model DiscussionRole {
+  id              String   @id @default(uuid())
+  discussionId    String
+  name            String
+  title           String
+  avatar          String?
+  expertise       String
+  personality     String
+  speakingStyle   String
+  principles      String
+  humanName       String?  // e.g. "陈明远" - a realistic Chinese name
+  actionStyle     String?  // e.g. "*推了推眼镜*" - signature action
+  backgroundStory String?  // brief background: "在硅谷工作十年的技术VP"
+  modelProvider   String  @default("anthropic")
+  modelId         String  @default("claude-sonnet-4-20250514")
+  color           String  @default("#6366f1")
+  orderIndex      Int     @default(0)
+  createdAt       DateTime @default(now())
+
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  messages     Message[]
+
+  @@index([discussionId])
+}
+
+model Message {
+  id           String   @id @default(uuid())
+  discussionId String
+  roleId       String?
+  roundId      String?
+  type         String   @default("ai") // ai | user | system
+  content      String
+  phase        Int?
+  phaseName    String?
+  createdAt    DateTime @default(now())
+
+  discussion   Discussion     @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  role         DiscussionRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  round        Round?         @relation(fields: [roundId], references: [id], onDelete: SetNull)
+
+  @@index([discussionId])
+  @@index([roundId])
+}
+
+model Round {
+  id                 String   @id @default(uuid())
+  discussionId       String
+  roundNumber        Int
+  phaseName          String?
+  phaseIndex         Int?
+  instruction        String?
+  status             String   @default("pending") // pending | active | completed
+  isCheckpoint       Boolean  @default(false)
+  checkpointSummary  String?  // LLM-generated phase summary
+  checkpointOptions  String?  // JSON: [{ id, label, description }]
+  checkpointResponse String?  // JSON: { optionId, customInstruction }
+  createdAt          DateTime @default(now())
+
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  messages     Message[]
+
+  @@index([discussionId])
+}
+
+model Framework {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String
+  description String
+  category    String
+  phases      String   // JSON array of phase definitions
+  triggers    String   // JSON array of trigger keywords
+  phaseCount  Int
+  createdAt   DateTime @default(now())
+
+  discussions Discussion[]
+}
+
+model RoleTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  title           String
+  expertise       String
+  personality     String
+  speakingStyle   String
+  principles      String
+  humanName       String?
+  actionStyle     String?
+  backgroundStory String?
+  category        String   @default("general")
+  isBuiltIn       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model UserSettings {
+  id               String   @id @default("default")
+  anthropicApiKey  String?
+  openaiApiKey     String?
+  providerKeys     String   @default("{}") // JSON: { "providerId": "apiKey", ... }
+  defaultProvider  String   @default("anthropic")
+  defaultModel     String   @default("claude-sonnet-4-20250514")
+  language         String   @default("zh-CN")
+  autoPlaySpeed    Int      @default(3) // seconds between messages in spectator mode
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  discussionId String?
+  action       String   // e.g. "discussion.create", "round.start", "checkpoint.respond"
+  actor        String   @default("system") // "system" | "user:<userId>"
+  details      String?  // JSON with action-specific details
+  createdAt    DateTime @default(now())
+
+  discussion   Discussion? @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+
+  @@index([discussionId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemPromptTemplate {
+  id          String   @id @default(uuid())
+  key         String   @unique  // e.g. "role_system", "phase_instruction", "topic_analysis"
+  name        String            // display name
+  content     String            // template with {{variable}} placeholders
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
