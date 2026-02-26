@@ -121,17 +121,21 @@ export function isCustomProviderEntry(value: unknown): value is CustomProviderEn
 export function extractProviderEntry(
   providerId: string,
   value: unknown
-): { key: string; baseUrl?: string } | undefined {
+): { key: string; baseUrl?: string; model?: string } | undefined {
   if (typeof value === 'string' && value) {
     const builtin = getProviderById(providerId);
     return { key: value, baseUrl: builtin?.baseUrl };
   }
   if (typeof value === 'object' && value !== null && 'key' in value) {
-    const obj = value as { key: string; baseUrl?: string };
+    const obj = value as { key: string; baseUrl?: string; model?: string };
     if (!obj.key) return undefined;
     // Use explicit baseUrl from entry; fall back to builtin default
     const builtin = getProviderById(providerId);
-    return { key: obj.key, baseUrl: obj.baseUrl || builtin?.baseUrl };
+    return {
+      key: obj.key,
+      baseUrl: obj.baseUrl || builtin?.baseUrl,
+      ...(obj.model ? { model: obj.model } : {}),
+    };
   }
   return undefined;
 }
@@ -139,8 +143,8 @@ export function extractProviderEntry(
 /** Parse the providerKeys JSON into a structured map of provider configs */
 export function parseProviderConfigs(
   providerKeysJson: Record<string, unknown>
-): Record<string, { key: string; baseUrl?: string }> {
-  const result: Record<string, { key: string; baseUrl?: string }> = {};
+): Record<string, { key: string; baseUrl?: string; model?: string }> {
+  const result: Record<string, { key: string; baseUrl?: string; model?: string }> = {};
   for (const [id, value] of Object.entries(providerKeysJson)) {
     const entry = extractProviderEntry(id, value);
     if (entry) result[id] = entry;

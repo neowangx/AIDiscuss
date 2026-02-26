@@ -80,14 +80,18 @@ export default function SettingsPage() {
   const initFromResponse = (data: SettingsData) => {
     const keys: Record<string, ProviderKeyValue> = {};
     const overrides: Record<string, string> = {};
+    const models: Record<string, string> = {};
 
     for (const [id, value] of Object.entries(data.providerKeys)) {
       if (isCustomEntry(value)) {
         keys[id] = value;
+        const v = value as CustomProviderEntry & { model?: string };
+        if (v.model) models[id] = v.model;
       } else if (typeof value === 'object' && value !== null && 'key' in value) {
-        const obj = value as { key: string; baseUrl?: string };
+        const obj = value as { key: string; baseUrl?: string; model?: string };
         keys[id] = obj.key;
         if (obj.baseUrl) overrides[id] = obj.baseUrl;
+        if (obj.model) models[id] = obj.model;
       } else if (typeof value === 'string') {
         keys[id] = value;
       }
@@ -95,6 +99,7 @@ export default function SettingsPage() {
 
     setProviderKeys(keys);
     setBaseUrlOverrides(overrides);
+    setModelOverrides(models);
   };
 
   const { configuredList, unconfiguredList } = useMemo(() => {
@@ -117,10 +122,16 @@ export default function SettingsPage() {
       if (value === null) {
         payload[id] = null;
       } else if (isCustomEntry(value)) {
-        payload[id] = value;
+        const model = modelOverrides[id];
+        payload[id] = { ...value, ...(model ? { model } : {}) };
       } else if (typeof value === 'string') {
         const override = baseUrlOverrides[id];
-        payload[id] = { key: value, ...(override ? { baseUrl: override } : {}) };
+        const model = modelOverrides[id];
+        payload[id] = {
+          key: value,
+          ...(override ? { baseUrl: override } : {}),
+          ...(model ? { model } : {}),
+        };
       }
     }
     return payload;
@@ -178,9 +189,7 @@ export default function SettingsPage() {
   };
 
   const getModelForProvider = (provider: ProviderInfo): string => {
-    if (modelOverrides[provider.id]) return modelOverrides[provider.id];
-    if (provider.id === defaultProvider) return defaultModel;
-    return provider.defaultModel;
+    return modelOverrides[provider.id] || '';
   };
 
   const setAsDefault = (providerId: string) => {
@@ -188,6 +197,10 @@ export default function SettingsPage() {
     const provider = settings?.providers.find(p => p.id === providerId);
     const model = modelOverrides[providerId] || provider?.defaultModel || '';
     setDefaultModel(model);
+    // If no explicit model override, also sync the provider's default model into the global default
+    if (!modelOverrides[providerId] && provider?.defaultModel) {
+      setDefaultModel(provider.defaultModel);
+    }
   };
 
   const updateCustomProviderField = (providerId: string, field: keyof CustomProviderEntry, value: string) => {
@@ -304,8 +317,8 @@ export default function SettingsPage() {
                 <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">默认</span>
               )}
             </div>
-            {isConfigured && model && (
-              <span className="text-xs text-muted-foreground">{model}</span>
+            {isConfigured && (
+              <span className="text-xs text-muted-foreground">{model || provider.defaultModel}</span>
             )}
           </div>
           {isExpanded ? (

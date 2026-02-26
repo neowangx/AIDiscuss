@@ -18,6 +18,7 @@ const SUMMARY_THRESHOLD = 15;
 interface ProviderConfigEntry {
   key: string;
   baseUrl?: string;
+  model?: string;
 }
 
 interface EngineConfig {

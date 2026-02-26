@@ -181,12 +181,20 @@ function getKeyFromEntry(entry: unknown): string | undefined {
 function maskEntry(value: unknown): unknown {
   if (isCustomProviderEntry(value)) {
     if (!value.key) return undefined;
-    return { name: value.name, baseUrl: value.baseUrl, key: maskKey(value.key) };
+    const v = value as { name: string; baseUrl: string; key: string; model?: string };
+    return {
+      name: v.name, baseUrl: v.baseUrl, key: maskKey(v.key),
+      ...(v.model ? { model: v.model } : {}),
+    };
   }
   if (typeof value === 'object' && value !== null && 'key' in value) {
-    const obj = value as { key: string; baseUrl?: string };
+    const obj = value as { key: string; baseUrl?: string; model?: string };
     if (!obj.key) return undefined;
-    return { key: maskKey(obj.key), ...(obj.baseUrl ? { baseUrl: obj.baseUrl } : {}) };
+    return {
+      key: maskKey(obj.key),
+      ...(obj.baseUrl ? { baseUrl: obj.baseUrl } : {}),
+      ...(obj.model ? { model: obj.model } : {}),
+    };
   }
   if (typeof value === 'string' && value) {
     return maskKey(value);
@@ -199,22 +207,30 @@ function mergeCustomEntry(
   newKeys: Record<string, unknown>,
   existingKeys: Record<string, unknown>,
   id: string,
-  value: { name: string; baseUrl: string; key: string }
+  value: { name: string; baseUrl: string; key: string; model?: string }
 ) {
   const existingKey = getKeyFromEntry(existingKeys[id]);
+  const entry = {
+    name: value.name,
+    baseUrl: value.baseUrl,
+    key: '',
+    ...(value.model ? { model: value.model } : {}),
+  };
   if (value.key && value.key.includes('***') && existingKey) {
-    newKeys[id] = { name: value.name, baseUrl: value.baseUrl, key: existingKey };
+    entry.key = existingKey;
+    newKeys[id] = entry;
   } else if (value.key && !value.key.includes('***')) {
-    newKeys[id] = value;
+    entry.key = value.key;
+    newKeys[id] = entry;
   }
 }
 
-/** Merge a builtin override entry { key, baseUrl? } into newKeys */
+/** Merge a builtin override entry { key, baseUrl?, model? } into newKeys */
 function mergeBuiltinObjectEntry(
   newKeys: Record<string, unknown>,
   existingKeys: Record<string, unknown>,
   id: string,
-  value: { key: string; baseUrl?: string }
+  value: { key: string; baseUrl?: string; model?: string }
 ) {
   const existingKey = getKeyFromEntry(existingKeys[id]);
   let realKey: string;
@@ -227,8 +243,13 @@ function mergeBuiltinObjectEntry(
     return; // no usable key
   }
 
-  if (value.baseUrl) {
-    newKeys[id] = { key: realKey, baseUrl: value.baseUrl };
+  const hasExtras = value.baseUrl || value.model;
+  if (hasExtras) {
+    newKeys[id] = {
+      key: realKey,
+      ...(value.baseUrl ? { baseUrl: value.baseUrl } : {}),
+      ...(value.model ? { model: value.model } : {}),
+    };
   } else {
     newKeys[id] = realKey; // no override, store as plain string
   }
