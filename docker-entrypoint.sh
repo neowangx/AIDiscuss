@@ -1,8 +1,12 @@
 #!/bin/sh
 set -e
 
-# Run database schema push
-node node_modules/prisma/build/index.js db push --skip-generate 2>&1 || echo "Warning: prisma db push failed"
+# If no database exists, copy the seed database (has correct schema)
+if [ ! -f /app/data/prod.db ]; then
+  echo "Initializing database from seed..."
+  cp /app/seed.db /app/data/prod.db
+  echo "Database initialized."
+fi
 
 # Start the server
 exec node server.js
