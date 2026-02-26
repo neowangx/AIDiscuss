@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_URL="file:./data/prod.db"
+ENV DATABASE_URL="file:/app/data/prod.db"
 RUN npx prisma generate
 RUN npm run build
 
@@ -22,7 +22,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_URL="file:./data/prod.db"
+ENV DATABASE_URL="file:/app/data/prod.db"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -38,7 +38,7 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Create data directory for SQLite
+# Create data directory for SQLite and ensure writable
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data /app/prisma
 
 COPY docker-entrypoint.sh ./
