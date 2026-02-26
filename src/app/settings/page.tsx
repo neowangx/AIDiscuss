@@ -141,13 +141,33 @@ export default function SettingsPage() {
     setSaving(true);
     setError('');
     try {
+      // Auto-switch default provider if current one has no key
+      let saveDefaultProvider = defaultProvider;
+      let saveDefaultModel = defaultModel;
+      const currentKey = providerKeys[defaultProvider];
+      const hasKey = currentKey && (typeof currentKey === 'string' ? currentKey.trim() : isCustomEntry(currentKey) ? currentKey.key.trim() : false);
+      if (!hasKey) {
+        // Find first provider with a key configured
+        for (const [id, value] of Object.entries(providerKeys)) {
+          const k = typeof value === 'string' ? value.trim() : isCustomEntry(value) ? value.key.trim() : '';
+          if (k) {
+            saveDefaultProvider = id;
+            const provider = settings?.providers.find(p => p.id === id);
+            saveDefaultModel = modelOverrides[id] || provider?.defaultModel || '';
+            setDefaultProvider(saveDefaultProvider);
+            setDefaultModel(saveDefaultModel);
+            break;
+          }
+        }
+      }
+
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerKeys: buildSavePayload(),
-          defaultProvider,
-          defaultModel,
+          defaultProvider: saveDefaultProvider,
+          defaultModel: saveDefaultModel,
           autoPlaySpeed,
         }),
       });
