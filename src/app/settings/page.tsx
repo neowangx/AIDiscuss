@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Eye, EyeOff, Check, AlertCircle, ChevronDown, ChevronRight, Plus, Trash2, X, Key, Cpu, Play, FileText } from 'lucide-react';
+import { Save, Eye, EyeOff, Check, AlertCircle, ChevronDown, ChevronRight, Plus, Trash2, X, Star, Play, FileText } from 'lucide-react';
 
 interface CustomProviderEntry {
   name: string;
@@ -36,21 +36,21 @@ function isCustomEntry(value: unknown): value is CustomProviderEntry {
   return typeof value === 'object' && value !== null && 'name' in value && 'baseUrl' in value && 'key' in value;
 }
 
-type SettingsTab = 'api' | 'model' | 'playback' | 'prompts';
+type SettingsTab = 'providers' | 'playback' | 'prompts';
 
-const tabs: { id: SettingsTab; label: string; icon: typeof Key }[] = [
-  { id: 'api', label: 'API 配置', icon: Key },
-  { id: 'model', label: '默认模型', icon: Cpu },
-  { id: 'playback', label: '播放设置', icon: Play },
-  { id: 'prompts', label: 'Prompt 模板', icon: FileText },
+const tabs: { id: SettingsTab; label: string }[] = [
+  { id: 'providers', label: '服务商配置' },
+  { id: 'playback', label: '播放设置' },
+  { id: 'prompts', label: 'Prompt 模板' },
 ];
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('api');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('providers');
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [providerKeys, setProviderKeys] = useState<Record<string, ProviderKeyValue>>({});
   const [baseUrlOverrides, setBaseUrlOverrides] = useState<Record<string, string>>({});
+  const [modelOverrides, setModelOverrides] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [defaultProvider, setDefaultProvider] = useState('anthropic');
@@ -169,6 +169,27 @@ export default function SettingsPage() {
     setBaseUrlOverrides(prev => ({ ...prev, [providerId]: value }));
   };
 
+  const updateModelOverride = (providerId: string, value: string) => {
+    setModelOverrides(prev => ({ ...prev, [providerId]: value }));
+    // If this is the default provider, update the global default model
+    if (providerId === defaultProvider) {
+      setDefaultModel(value);
+    }
+  };
+
+  const getModelForProvider = (provider: ProviderInfo): string => {
+    if (modelOverrides[provider.id]) return modelOverrides[provider.id];
+    if (provider.id === defaultProvider) return defaultModel;
+    return provider.defaultModel;
+  };
+
+  const setAsDefault = (providerId: string) => {
+    setDefaultProvider(providerId);
+    const provider = settings?.providers.find(p => p.id === providerId);
+    const model = modelOverrides[providerId] || provider?.defaultModel || '';
+    setDefaultModel(model);
+  };
+
   const updateCustomProviderField = (providerId: string, field: keyof CustomProviderEntry, value: string) => {
     setProviderKeys(prev => {
       const existing = prev[providerId];
@@ -227,12 +248,11 @@ export default function SettingsPage() {
       });
     }
     if (expandedProvider === providerId) setExpandedProvider(null);
+    if (defaultProvider === providerId) {
+      setDefaultProvider('anthropic');
+      setDefaultModel('claude-sonnet-4-20250514');
+    }
   };
-
-  const configuredProvidersFull = useMemo(() => {
-    if (!settings) return [];
-    return settings.providers.filter(p => settings.configuredProviders.includes(p.id));
-  }, [settings]);
 
   const handleTabChange = (tab: SettingsTab) => {
     if (tab === 'prompts') {
@@ -250,14 +270,19 @@ export default function SettingsPage() {
     );
   }
 
+  const inputClass = "w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
   const renderProviderRow = (provider: ProviderInfo) => {
     const isConfigured = settings.configuredProviders.includes(provider.id);
     const isExpanded = expandedProvider === provider.id;
     const keyEntry = providerKeys[provider.id];
     const isCustom = provider.isCustom;
+    const isDefault = defaultProvider === provider.id;
+    const model = getModelForProvider(provider);
 
     return (
-      <div key={provider.id} className="border border-border rounded-lg overflow-hidden">
+      <div key={provider.id} className={`border rounded-lg overflow-hidden transition-colors ${isDefault ? 'border-primary/50 bg-primary/[0.02]' : 'border-border'}`}>
+        {/* Header row */}
         <div
           className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-secondary/50 transition-colors"
           onClick={() => toggleExpand(provider.id)}
@@ -268,11 +293,19 @@ export default function SettingsPage() {
             <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />
           )}
           <div className="flex-1 min-w-0">
-            <span className={`text-sm font-medium ${isConfigured ? 'text-foreground' : 'text-muted-foreground'}`}>
-              {provider.name}
-            </span>
-            {isCustom && (
-              <span className="ml-2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">自定义</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${isConfigured ? 'text-foreground' : 'text-muted-foreground'}`}>
+                {provider.name}
+              </span>
+              {isCustom && (
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">自定义</span>
+              )}
+              {isDefault && isConfigured && (
+                <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">默认</span>
+              )}
+            </div>
+            {isConfigured && model && (
+              <span className="text-xs text-muted-foreground">{model}</span>
             )}
           </div>
           {isExpanded ? (
@@ -282,6 +315,7 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {/* Expanded panel */}
         {isExpanded && (
           <div className="px-4 pb-4 pt-1 space-y-3 border-t border-border bg-secondary/20">
             {isCustom ? (
@@ -292,17 +326,7 @@ export default function SettingsPage() {
                     type="text"
                     value={isCustomEntry(keyEntry) ? keyEntry.name : provider.name}
                     onChange={(e) => updateCustomProviderField(provider.id, 'name', e.target.value)}
-                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs text-muted-foreground">Base URL</span>
-                  <input
-                    type="text"
-                    value={isCustomEntry(keyEntry) ? keyEntry.baseUrl : provider.baseUrl || ''}
-                    onChange={(e) => updateCustomProviderField(provider.id, 'baseUrl', e.target.value)}
-                    placeholder="https://api.example.com/v1"
-                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className={inputClass}
                   />
                 </label>
                 <label className="block">
@@ -324,12 +348,46 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </label>
-                <button
-                  onClick={() => deleteCustomProvider(provider.id)}
-                  className="flex items-center gap-1 text-sm text-destructive hover:text-destructive/80"
-                >
-                  <Trash2 className="w-3 h-3" /> 删除此服务
-                </button>
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">Base URL</span>
+                  <input
+                    type="text"
+                    value={isCustomEntry(keyEntry) ? keyEntry.baseUrl : provider.baseUrl || ''}
+                    onChange={(e) => updateCustomProviderField(provider.id, 'baseUrl', e.target.value)}
+                    placeholder="https://api.example.com/v1"
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">模型</span>
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => updateModelOverride(provider.id, e.target.value)}
+                    placeholder="模型 ID，如 gpt-4o"
+                    className={inputClass}
+                  />
+                </label>
+                <div className="flex items-center justify-between pt-1">
+                  {!isDefault ? (
+                    <button
+                      onClick={() => setAsDefault(provider.id)}
+                      className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                    >
+                      <Star className="w-3.5 h-3.5" /> 设为默认
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1 text-sm text-primary font-medium">
+                      <Star className="w-3.5 h-3.5 fill-primary" /> 当前默认
+                    </span>
+                  )}
+                  <button
+                    onClick={() => deleteCustomProvider(provider.id)}
+                    className="flex items-center gap-1 text-sm text-destructive hover:text-destructive/80"
+                  >
+                    <Trash2 className="w-3 h-3" /> 删除
+                  </button>
+                </div>
               </>
             ) : (
               <>
@@ -359,9 +417,35 @@ export default function SettingsPage() {
                     value={baseUrlOverrides[provider.id] || ''}
                     onChange={(e) => updateBaseUrlOverride(provider.id, e.target.value)}
                     placeholder={provider.baseUrl ? `默认: ${provider.baseUrl}` : '使用 SDK 默认地址'}
-                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className={inputClass}
                   />
                 </label>
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">模型</span>
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => updateModelOverride(provider.id, e.target.value)}
+                    placeholder={`默认: ${provider.defaultModel}`}
+                    className={inputClass}
+                  />
+                </label>
+                {isConfigured && (
+                  <div className="pt-1">
+                    {!isDefault ? (
+                      <button
+                        onClick={() => setAsDefault(provider.id)}
+                        className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                      >
+                        <Star className="w-3.5 h-3.5" /> 设为默认
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-1 text-sm text-primary font-medium">
+                        <Star className="w-3.5 h-3.5 fill-primary" /> 当前默认
+                      </span>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -378,24 +462,17 @@ export default function SettingsPage() {
       <div className="relative mb-6 border-b border-border">
         <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
-            const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
                 className={`
-                  relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap
-                  transition-colors
-                  ${isActive
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                  }
+                  relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors
+                  ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}
                 `}
               >
-                <Icon className="w-4 h-4" />
                 {tab.label}
-                {/* Active indicator */}
                 {isActive && (
                   <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-t-full tab-underline" />
                 )}
@@ -406,13 +483,12 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6 animate-fade-in" key={activeTab}>
-        {/* API Config Tab */}
-        {activeTab === 'api' && (
-          <section className="bg-card rounded-xl border border-border p-6 space-y-4">
+        {/* Providers Tab */}
+        {activeTab === 'providers' && (
+          <section className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold">API 服务配置</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                配置 AI 模型的 API 密钥。至少需要一个才能开始讨论。
+              <p className="text-sm text-muted-foreground">
+                配置 AI 服务商的 API Key、地址和模型。带 <span className="text-primary font-medium">默认</span> 标记的服务商将用于新建讨论。
               </p>
             </div>
 
@@ -436,7 +512,7 @@ export default function SettingsPage() {
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     placeholder="如：我的代理、OpenRouter"
-                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className={inputClass}
                   />
                 </label>
                 <label className="block">
@@ -446,7 +522,7 @@ export default function SettingsPage() {
                     value={customBaseUrl}
                     onChange={(e) => setCustomBaseUrl(e.target.value)}
                     placeholder="https://api.example.com/v1"
-                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className={inputClass}
                   />
                 </label>
                 <label className="block">
@@ -456,7 +532,7 @@ export default function SettingsPage() {
                     value={customKey}
                     onChange={(e) => setCustomKey(e.target.value)}
                     placeholder="sk-..."
-                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className={inputClass}
                   />
                 </label>
                 <button
@@ -475,52 +551,6 @@ export default function SettingsPage() {
                 <Plus className="w-4 h-4" /> 自定义服务
               </button>
             )}
-          </section>
-        )}
-
-        {/* Default Model Tab */}
-        {activeTab === 'model' && (
-          <section className="bg-card rounded-xl border border-border p-6 space-y-4">
-            <h2 className="text-lg font-semibold">默认模型</h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label className="block">
-                <span className="text-sm font-medium">Provider</span>
-                <select
-                  value={defaultProvider}
-                  onChange={(e) => {
-                    const newProvider = e.target.value;
-                    setDefaultProvider(newProvider);
-                    const config = settings.providers.find(p => p.id === newProvider);
-                    if (config?.defaultModel) {
-                      setDefaultModel(config.defaultModel);
-                    }
-                  }}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {configuredProvidersFull.length > 0 ? (
-                    configuredProvidersFull.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))
-                  ) : (
-                    settings.providers.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))
-                  )}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium">模型</span>
-                <input
-                  type="text"
-                  value={defaultModel}
-                  onChange={(e) => setDefaultModel(e.target.value)}
-                  placeholder="如 gpt-4o, claude-sonnet-4-20250514"
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </label>
-            </div>
           </section>
         )}
 
