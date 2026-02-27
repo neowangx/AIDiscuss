@@ -32,6 +32,8 @@ export interface RoleConfig {
   humanName?: string;       // e.g. "陈明远" - realistic name
   actionStyle?: string;     // e.g. "*推了推眼镜*" - signature action
   backgroundStory?: string; // e.g. "硅谷十年技术VP"
+  roleType?: 'participant' | 'summarizer';
+  abilities?: string[];
   modelProvider: string;
   modelId: string;
   color: string;
@@ -39,8 +41,8 @@ export interface RoleConfig {
 }
 
 // ===== Discussion Types =====
-export type DiscussionMode = 'spectator' | 'moderator' | 'boss_checkin';
-export type DiscussionStatus = 'created' | 'running' | 'paused' | 'completed' | 'checkpoint';
+export type DiscussionMode = 'spectator' | 'moderator' | 'boss_checkin' | 'smart';
+export type DiscussionStatus = 'created' | 'running' | 'paused' | 'completed' | 'checkpoint' | 'waiting_user' | 'clarifying_goals';
 export type MessageType = 'ai' | 'user' | 'system';
 
 export interface DiscussionConfig {
@@ -83,6 +85,8 @@ export interface DiscussionData {
   currentPhase: number;
   currentRound: number;
   summary?: string | null;
+  goals?: DiscussionGoals | null;
+  smartConfig?: SmartConfig | null;
   createdAt: string;
   updatedAt: string;
   roles: RoleConfig[];
@@ -123,7 +127,13 @@ export type SSEEventType =
   | 'discussion_end'
   | 'checkpoint'
   | 'error'
-  | 'waiting_for_user';
+  | 'waiting_for_user'
+  | 'orchestrator_decision'
+  | 'user_pull_in'
+  | 'web_search_start'
+  | 'web_search_result'
+  | 'summary_start'
+  | 'goals_confirmed';
 
 export interface SSEEvent {
   type: SSEEventType;
@@ -138,6 +148,12 @@ export interface SSEEvent {
     phaseName?: string;
     error?: string;
     checkpoint?: CheckpointData;
+    // Smart mode fields
+    decision?: OrchestratorDecision;
+    pullInQuestion?: string;
+    searchQuery?: string;
+    searchResults?: WebSearchResult[];
+    goals?: DiscussionGoals;
   };
 }
 
@@ -209,6 +225,40 @@ export interface PromptTemplate {
   content: string;
   description?: string | null;
   isDefault: boolean;
+}
+
+// ===== Smart Discussion Types =====
+export interface DiscussionGoals {
+  primaryGoal: string;
+  subGoals: string[];
+  clarified: boolean;
+}
+
+export interface SmartConfig {
+  roundsSinceSummary: number;
+  lastSummaryRoundNumber: number;
+  contextDigest: string;         // 压缩的滚动摘要（200字以内）
+  pendingUserPullIn: boolean;
+  lastPullInRound?: number;      // 上次拉入用户的轮次号，防止同一轮重复拉入
+}
+
+export interface OrchestratorDecision {
+  selectedRoleIds: string[];
+  reason: string;
+  isSummaryRound: boolean;
+  shouldPullInUser: boolean;
+  pullInQuestion?: string;
+  shouldSearch: boolean;
+  searchQuery?: string;
+  discussionComplete: boolean;
+  nextTopicFocus: string;
+  methodHint?: string;
+}
+
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
 }
 
 // ===== Store Types =====

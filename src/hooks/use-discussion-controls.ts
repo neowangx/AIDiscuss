@@ -11,7 +11,7 @@ export function useDiscussionControls(discussionId: string) {
 
   const handleNextRound = useCallback(
     (instruction?: string) => {
-      if (isStreaming || store.status === 'completed') return;
+      if (isStreaming || store.status === 'completed' || store.status === 'waiting_user') return;
       store.setStatus('running');
       startRound(discussionId, instruction);
     },
@@ -31,13 +31,14 @@ export function useDiscussionControls(discussionId: string) {
   }, [isStreaming, store, stopStreaming]);
 
   const handleResume = useCallback(() => {
+    if (store.status === 'waiting_user') return; // Don't auto-resume when waiting for user
     store.setAutoPlayEnabled(true);
     store.setStatus('running');
   }, [store]);
 
   const handleToggleMode = useCallback(() => {
-    const modes: Array<'spectator' | 'moderator' | 'boss_checkin'> = ['spectator', 'boss_checkin', 'moderator'];
-    const currentIndex = modes.indexOf(store.mode as 'spectator' | 'moderator' | 'boss_checkin');
+    const modes: Array<'spectator' | 'moderator' | 'boss_checkin' | 'smart'> = ['spectator', 'boss_checkin', 'moderator', 'smart'];
+    const currentIndex = modes.indexOf(store.mode as typeof modes[number]);
     const newMode = modes[(currentIndex + 1) % modes.length];
     store.setMode(newMode);
     // Update on server
@@ -48,10 +49,52 @@ export function useDiscussionControls(discussionId: string) {
     });
   }, [discussionId, store]);
 
-  // Auto-play in spectator and boss_checkin modes
+  const handleUserPullInResponse = useCallback(
+    async (answer: string) => {
+      try {
+        const res = await fetch(`/api/discussions/${discussionId}/user-input`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answer }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: '请求失败' }));
+          throw new Error(err.error);
+        }
+        store.setWaitingForUser(false);
+        store.setPullInQuestion(null);
+        store.setStatus('running');
+        // Directly start next round instead of waiting for auto-play timer
+        startRound(discussionId);
+      } catch (error) {
+        store.setError((error as Error).message);
+      }
+    },
+    [discussionId, store, startRound]
+  );
+
+  const handleSkipPullIn = useCallback(async () => {
+    store.setWaitingForUser(false);
+    store.setPullInQuestion(null);
+    try {
+      await fetch(`/api/discussions/${discussionId}/user-input`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer: '（用户跳过了此问题）' }),
+      });
+      store.setStatus('running');
+      // Directly start next round
+      startRound(discussionId);
+    } catch (error) {
+      store.setError((error as Error).message);
+    }
+  }, [discussionId, store, startRound]);
+
+  // Auto-play in spectator, boss_checkin, and smart modes
+  // Note: status === 'running' already excludes 'waiting_user'
   useEffect(() => {
     if (
-      (store.mode === 'spectator' || store.mode === 'boss_checkin') &&
+      (store.mode === 'spectator' || store.mode === 'boss_checkin' || store.mode === 'smart') &&
       store.autoPlayEnabled &&
       store.status === 'running' &&
       !isStreaming
@@ -73,6 +116,8 @@ export function useDiscussionControls(discussionId: string) {
     handlePause,
     handleResume,
     handleToggleMode,
+    handleUserPullInResponse,
+    handleSkipPullIn,
     isStreaming,
     mode: store.mode,
     status: store.status,

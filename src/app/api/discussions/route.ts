@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, topic, frameworkId, mode, roles } = body;
+    const { title, topic, frameworkId, mode, roles, goals } = body;
 
     if (!topic) {
       return NextResponse.json({ error: '请输入讨论主题' }, { status: 400 });
@@ -75,14 +75,27 @@ export async function POST(request: Request) {
 
     const user = await getSession();
 
+    // For smart mode, initialize smartConfig
+    const isSmartMode = mode === 'smart';
+    const initialSmartConfig = isSmartMode
+      ? JSON.stringify({
+          roundsSinceSummary: 0,
+          lastSummaryRoundNumber: 0,
+          contextDigest: '',
+          pendingUserPullIn: false,
+        })
+      : null;
+
     const discussion = await prisma.discussion.create({
       data: {
         title: title || topic.slice(0, 50),
         topic,
-        frameworkId: frameworkId || null,
-        userId: user?.id || null,
+        ...(frameworkId ? { framework: { connect: { id: frameworkId } } } : {}),
+        ...(user ? { user: { connect: { id: user.id } } } : {}),
         mode: mode || 'spectator',
         status: 'created',
+        goals: goals ? JSON.stringify(goals) : null,
+        smartConfig: initialSmartConfig,
         roles: {
           create: (roles || []).map((role: Record<string, unknown>, i: number) => ({
             name: role.name as string,
@@ -95,6 +108,8 @@ export async function POST(request: Request) {
             humanName: (role.humanName as string) || null,
             actionStyle: (role.actionStyle as string) || null,
             backgroundStory: (role.backgroundStory as string) || null,
+            roleType: (role.roleType as string) || 'participant',
+            abilities: role.abilities ? JSON.stringify(role.abilities) : null,
             modelProvider: (role.modelProvider as string) || 'anthropic',
             modelId: (role.modelId as string) || 'claude-sonnet-4-20250514',
             color: (role.color as string) || '#6366f1',

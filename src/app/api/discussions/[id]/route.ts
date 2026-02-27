@@ -25,8 +25,28 @@ export async function GET(
       return NextResponse.json({ error: '讨论不存在' }, { status: 404 });
     }
 
+    // Parse JSON fields
+    let goals = null;
+    try {
+      if (discussion.goals) goals = JSON.parse(discussion.goals);
+    } catch { /* ignore */ }
+
+    let smartConfig = null;
+    try {
+      if (discussion.smartConfig) smartConfig = JSON.parse(discussion.smartConfig);
+    } catch { /* ignore */ }
+
+    // Parse role abilities
+    const roles = discussion.roles.map(r => ({
+      ...r,
+      abilities: r.abilities ? JSON.parse(r.abilities) : undefined,
+    }));
+
     const result = {
       ...discussion,
+      roles,
+      goals,
+      smartConfig,
       framework: discussion.framework
         ? { ...discussion.framework, phases: JSON.parse(discussion.framework.phases), triggers: JSON.parse(discussion.framework.triggers) }
         : null,

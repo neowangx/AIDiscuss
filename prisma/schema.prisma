@@ -30,6 +30,8 @@ model Discussion {
   currentPhase    Int      @default(0)
   currentRound    Int      @default(0)
   summary         String?
+  goals           String?  // JSON: { primaryGoal, subGoals[], clarified }
+  smartConfig     String?  // JSON: 编排器跨轮状态（contextDigest, roundsSinceSummary...）
   frameworkHistory String?  // JSON: [{ frameworkId, switchedAt, reason }]
   rating          Int?     // 1-5 star rating
   feedback        String?  // user feedback text
@@ -60,6 +62,8 @@ model DiscussionRole {
   humanName       String?  // e.g. "陈明远" - a realistic Chinese name
   actionStyle     String?  // e.g. "*推了推眼镜*" - signature action
   backgroundStory String?  // brief background: "在硅谷工作十年的技术VP"
+  roleType        String  @default("participant") // "participant" | "summarizer"
+  abilities       String?  // JSON: string[]
   modelProvider   String  @default("anthropic")
   modelId         String  @default("claude-sonnet-4-20250514")
   color           String  @default("#6366f1")
@@ -99,6 +103,8 @@ model Round {
   phaseIndex         Int?
   instruction        String?
   status             String   @default("pending") // pending | active | completed
+  selectedRoleIds    String?   // JSON: string[] 本轮发言的角色 (smart mode)
+  orchestratorLog    String?   // JSON: 编排决策记录 (smart mode)
   isCheckpoint       Boolean  @default(false)
   checkpointSummary  String?  // LLM-generated phase summary
   checkpointOptions  String?  // JSON: [{ id, label, description }]

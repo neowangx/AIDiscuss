@@ -4,6 +4,13 @@ import { useCallback, useRef } from 'react';
 import { useDiscussionStore } from '@/stores/discussion-store';
 import { SSEEvent, MessageData } from '@/types';
 
+// TTS callback ref — set by the discussion page to avoid circular deps
+let ttsCallback: ((text: string) => void) | null = null;
+
+export function setTTSCallback(cb: ((text: string) => void) | null) {
+  ttsCallback = cb;
+}
+
 export function useStreaming() {
   const abortRef = useRef<AbortController | null>(null);
   const store = useDiscussionStore();
@@ -133,6 +140,11 @@ function handleSSEEvent(
         };
         store.addMessage(msg);
         store.setStreamingMessage(null);
+
+        // TTS: speak the completed message if enabled
+        if (useDiscussionStore.getState().ttsEnabled && ttsCallback) {
+          ttsCallback(streaming.content);
+        }
       }
       break;
     }
@@ -154,6 +166,40 @@ function handleSSEEvent(
 
     case 'waiting_for_user':
       // In moderator mode, signal waiting for user input
+      break;
+
+    case 'orchestrator_decision':
+      if (event.data.decision) {
+        store.setOrchestratorDecision(event.data.decision);
+      }
+      break;
+
+    case 'user_pull_in':
+      store.setWaitingForUser(true);
+      if (event.data.pullInQuestion) {
+        store.setPullInQuestion(event.data.pullInQuestion);
+      }
+      store.setStatus('waiting_user');
+      break;
+
+    case 'web_search_start':
+      // Search in progress — could show loading state
+      break;
+
+    case 'web_search_result':
+      if (event.data.searchResults) {
+        store.setSearchResults(event.data.searchResults);
+      }
+      break;
+
+    case 'summary_start':
+      // Summary generation in progress
+      break;
+
+    case 'goals_confirmed':
+      if (event.data.goals) {
+        store.setGoals(event.data.goals);
+      }
       break;
   }
 }

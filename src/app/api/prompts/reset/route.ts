@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getSession } from '@/lib/auth/session';
 
 // 与 /api/prompts/route.ts 中的默认模板保持一致
 const DEFAULT_TEMPLATES: Record<string, { name: string; content: string; description: string }> = {
@@ -57,6 +58,11 @@ const DEFAULT_TEMPLATES: Record<string, { name: string; content: string; descrip
 
 export async function POST(request: Request) {
   try {
+    const session = await getSession();
+    if (!session?.isAdmin) {
+      return NextResponse.json({ error: '无权操作' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { key } = body;
 

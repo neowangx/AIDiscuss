@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { runDiscussionRound } from '@/lib/orchestrator/discussion-engine';
-import { FrameworkDefinition } from '@/types';
-import { isCustomProviderEntry, parseProviderConfigs } from '@/lib/llm/providers';
+import { runSmartRound } from '@/lib/orchestrator/smart-engine';
+import { FrameworkDefinition, DiscussionGoals, SmartConfig } from '@/types';
+import { parseProviderConfigs } from '@/lib/llm/providers';
 
 export async function POST(
   request: Request,
@@ -89,23 +90,60 @@ export async function POST(
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const generator = runDiscussionRound({
-            discussionId: id,
-            topic: discussion.topic,
-            roles: discussion.roles.map(r => ({
-              ...r,
-              avatar: r.avatar ?? undefined,
-              humanName: r.humanName ?? undefined,
-              actionStyle: r.actionStyle ?? undefined,
-              backgroundStory: r.backgroundStory ?? undefined,
-            })),
-            framework,
-            currentPhase: discussion.currentPhase,
-            roundNumber: discussion.currentRound,
-            userInstruction,
-            providerConfigs,
-            mode: discussion.mode as 'spectator' | 'moderator' | 'boss_checkin',
-          });
+          const mappedRoles = discussion.roles.map(r => ({
+            ...r,
+            avatar: r.avatar ?? undefined,
+            humanName: r.humanName ?? undefined,
+            actionStyle: r.actionStyle ?? undefined,
+            backgroundStory: r.backgroundStory ?? undefined,
+            roleType: (r.roleType as 'participant' | 'summarizer') || 'participant',
+            abilities: r.abilities ? JSON.parse(r.abilities) as string[] : undefined,
+          }));
+
+          // Smart mode branch
+          const isSmartMode = discussion.mode === 'smart';
+          let generator;
+
+          if (isSmartMode) {
+            // Parse goals and smartConfig
+            let goals: DiscussionGoals = { primaryGoal: discussion.topic, subGoals: [], clarified: true };
+            try {
+              if (discussion.goals) goals = JSON.parse(discussion.goals);
+            } catch { /* use default */ }
+
+            let smartConfig: SmartConfig = {
+              roundsSinceSummary: 0,
+              lastSummaryRoundNumber: 0,
+              contextDigest: '',
+              pendingUserPullIn: false,
+            };
+            try {
+              if (discussion.smartConfig) smartConfig = { ...smartConfig, ...JSON.parse(discussion.smartConfig) };
+            } catch { /* use default */ }
+
+            generator = runSmartRound({
+              discussionId: id,
+              topic: discussion.topic,
+              roles: mappedRoles,
+              goals,
+              smartConfig,
+              roundNumber: discussion.currentRound,
+              providerConfigs,
+              userInstruction,
+            });
+          } else {
+            generator = runDiscussionRound({
+              discussionId: id,
+              topic: discussion.topic,
+              roles: mappedRoles,
+              framework,
+              currentPhase: discussion.currentPhase,
+              roundNumber: discussion.currentRound,
+              userInstruction,
+              providerConfigs,
+              mode: discussion.mode as 'spectator' | 'moderator' | 'boss_checkin',
+            });
+          }
 
           for await (const event of generator) {
             const data = `data: ${JSON.stringify(event)}\n\n`;

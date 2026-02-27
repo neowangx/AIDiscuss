@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>('providers');
   const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [forbidden, setForbidden] = useState(false);
   const [providerKeys, setProviderKeys] = useState<Record<string, ProviderKeyValue>>({});
   const [baseUrlOverrides, setBaseUrlOverrides] = useState<Record<string, string>>({});
   const [modelOverrides, setModelOverrides] = useState<Record<string, string>>({});
@@ -67,8 +68,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetch('/api/settings')
-      .then(r => r.json())
-      .then((data: SettingsData) => {
+      .then(r => {
+        if (r.status === 403) {
+          setForbidden(true);
+          return null;
+        }
+        return r.json();
+      })
+      .then((data: SettingsData | null) => {
+        if (!data) return;
         setSettings(data);
         initFromResponse(data);
         setDefaultProvider(data.defaultProvider || 'anthropic');
@@ -294,6 +302,18 @@ export default function SettingsPage() {
     }
     setActiveTab(tab);
   };
+
+  if (forbidden) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center space-y-2">
+          <AlertCircle className="w-8 h-8 text-destructive mx-auto" />
+          <p className="text-destructive font-medium">无权访问</p>
+          <p className="text-sm text-muted-foreground">只有管理员可以访问设置页面</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!settings) {
     return (

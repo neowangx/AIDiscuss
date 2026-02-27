@@ -10,6 +10,9 @@ import {
   StreamingMessage,
   FrameworkDefinition,
   CheckpointData,
+  DiscussionGoals,
+  OrchestratorDecision,
+  WebSearchResult,
 } from '@/types';
 
 interface DiscussionState {
@@ -31,6 +34,16 @@ interface DiscussionState {
   error: string | null;
   checkpointData: CheckpointData | null;
 
+  // Smart mode state
+  goals: DiscussionGoals | null;
+  waitingForUser: boolean;
+  pullInQuestion: string | null;
+  orchestratorDecision: OrchestratorDecision | null;
+  searchResults: WebSearchResult[] | null;
+
+  // TTS state
+  ttsEnabled: boolean;
+
   // Actions
   setDiscussion: (discussion: DiscussionData) => void;
   addMessage: (message: MessageData) => void;
@@ -45,6 +58,12 @@ interface DiscussionState {
   setAutoPlaySpeed: (speed: number) => void;
   setError: (error: string | null) => void;
   setCheckpointData: (data: CheckpointData | null) => void;
+  setGoals: (goals: DiscussionGoals | null) => void;
+  setWaitingForUser: (waiting: boolean) => void;
+  setPullInQuestion: (question: string | null) => void;
+  setOrchestratorDecision: (decision: OrchestratorDecision | null) => void;
+  setSearchResults: (results: WebSearchResult[] | null) => void;
+  setTtsEnabled: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -63,6 +82,12 @@ const initialState = {
   autoPlaySpeed: 3,
   error: null,
   checkpointData: null,
+  goals: null,
+  waitingForUser: false,
+  pullInQuestion: null,
+  orchestratorDecision: null,
+  searchResults: null,
+  ttsEnabled: false,
 };
 
 export const useDiscussionStore = create<DiscussionState>((set) => ({
@@ -78,6 +103,8 @@ export const useDiscussionStore = create<DiscussionState>((set) => ({
       currentRound: discussion.currentRound,
       mode: discussion.mode,
       status: discussion.status,
+      goals: discussion.goals || null,
+      waitingForUser: discussion.status === 'waiting_user',
     }),
 
   addMessage: (message) =>
@@ -103,5 +130,11 @@ export const useDiscussionStore = create<DiscussionState>((set) => ({
   setAutoPlaySpeed: (speed) => set({ autoPlaySpeed: speed }),
   setError: (error) => set({ error }),
   setCheckpointData: (data) => set({ checkpointData: data }),
+  setGoals: (goals) => set({ goals }),
+  setWaitingForUser: (waiting) => set({ waitingForUser: waiting }),
+  setPullInQuestion: (question) => set({ pullInQuestion: question }),
+  setOrchestratorDecision: (decision) => set({ orchestratorDecision: decision }),
+  setSearchResults: (results) => set({ searchResults: results }),
+  setTtsEnabled: (enabled) => set({ ttsEnabled: enabled }),
   reset: () => set(initialState),
 }));

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, Check, AlertCircle, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
+import { Save, Check, AlertCircle, RotateCcw, ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react';
 
 interface PromptTemplate {
   id: string;
@@ -42,6 +42,7 @@ const TEMPLATE_VARIABLES: Record<string, Array<{ name: string; desc: string }>> 
 export default function PromptsSettingsPage() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
@@ -56,6 +57,11 @@ export default function PromptsSettingsPage() {
   const fetchTemplates = async () => {
     try {
       const res = await fetch('/api/prompts');
+      if (res.status === 403) {
+        setForbidden(true);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
       setTemplates(data.templates || []);
       if (data.templates?.length > 0 && !selectedKey) {
@@ -149,6 +155,18 @@ export default function PromptsSettingsPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (forbidden) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center space-y-2">
+          <ShieldAlert className="w-8 h-8 text-destructive mx-auto" />
+          <p className="text-destructive font-medium">无权访问</p>
+          <p className="text-sm text-muted-foreground">只有管理员可以管理 Prompt 模板</p>
+        </div>
       </div>
     );
   }

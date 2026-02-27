@@ -71,10 +71,13 @@ export async function POST(request: Request) {
     }
 
     // Register: create new user
+    // First user automatically becomes admin
+    const userCount = await prisma.user.count();
     const newUser = await prisma.user.create({
       data: {
         name: name.trim(),
         accessCode: accessCode.trim(),
+        isAdmin: userCount === 0,
       },
     });
 

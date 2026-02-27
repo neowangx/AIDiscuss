@@ -8,6 +8,9 @@ import { PhaseIndicator } from '@/components/discussion/phase-indicator';
 import { ControlBar } from '@/components/discussion/control-bar';
 import { ExportMenu } from '@/components/discussion/export-menu';
 import { FeedbackPanel } from '@/components/discussion/feedback-panel';
+import { GoalsPanel } from '@/components/discussion/goals-panel';
+import { useTTS } from '@/hooks/use-tts';
+import { setTTSCallback } from '@/hooks/use-streaming';
 import { DiscussionData } from '@/types';
 import { Loader2, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -19,6 +22,13 @@ export default function DiscussionPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const tts = useTTS();
+
+  // Wire up TTS callback for streaming
+  useEffect(() => {
+    setTTSCallback(tts.speak);
+    return () => setTTSCallback(null);
+  }, [tts.speak]);
 
   useEffect(() => {
     const loadDiscussion = async () => {
@@ -97,6 +107,11 @@ export default function DiscussionPage({ params }: { params: Promise<{ id: strin
           <RolePanel />
         </div>
 
+        {/* Goals Panel (smart mode) */}
+        {store.goals && store.mode === 'smart' && (
+          <GoalsPanel goals={store.goals} />
+        )}
+
         {/* Phase Indicator */}
         <PhaseIndicator />
 
@@ -130,13 +145,15 @@ export default function DiscussionPage({ params }: { params: Promise<{ id: strin
         )}
 
         {/* Messages */}
-        <MessageList discussionId={id} />
+        <MessageList discussionId={id} onSpeak={tts.speak} />
 
         {/* Control Bar */}
         <ControlBar
           discussionId={id}
           onGenerateSummary={handleGenerateSummary}
           generatingSummary={generatingSummary}
+          ttsEnabled={tts.enabled}
+          onToggleTTS={tts.toggle}
         />
       </div>
 

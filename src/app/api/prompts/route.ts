@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getSession } from '@/lib/auth/session';
 
 // 默认模板种子数据
 const DEFAULT_TEMPLATES = [
@@ -74,6 +75,11 @@ async function ensureSeedData() {
 
 export async function GET() {
   try {
+    const session = await getSession();
+    if (!session?.isAdmin) {
+      return NextResponse.json({ error: '无权访问' }, { status: 403 });
+    }
+
     await ensureSeedData();
 
     const templates = await prisma.systemPromptTemplate.findMany({
@@ -91,6 +97,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getSession();
+    if (!session?.isAdmin) {
+      return NextResponse.json({ error: '无权修改' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { key, name, content, description } = body;
 

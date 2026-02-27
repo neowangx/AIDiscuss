@@ -5,13 +5,16 @@ import { useDiscussionStore } from '@/stores/discussion-store';
 import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { MessageBubble } from './message-bubble';
 import { CheckpointCard } from './checkpoint-card';
+import { OrchestratorIndicator } from './orchestrator-indicator';
+import { SearchResultCard } from './search-result-card';
 
 interface MessageListProps {
   discussionId?: string;
+  onSpeak?: (text: string) => void;
 }
 
-export function MessageList({ discussionId }: MessageListProps) {
-  const { messages, streamingMessage, roles, checkpointData, status } = useDiscussionStore();
+export function MessageList({ discussionId, onSpeak }: MessageListProps) {
+  const { messages, streamingMessage, roles, checkpointData, status, orchestratorDecision, searchResults, mode } = useDiscussionStore();
   const store = useDiscussionStore();
   const { containerRef, handleScroll } = useAutoScroll([messages.length, streamingMessage?.content]);
   const [checkpointResponding, setCheckpointResponding] = useState(false);
@@ -95,6 +98,7 @@ export function MessageList({ discussionId }: MessageListProps) {
             content={msg.content}
             color={role.color}
             phaseName={msg.phaseName}
+            onSpeak={onSpeak}
           />
         );
       })}
@@ -122,6 +126,16 @@ export function MessageList({ discussionId }: MessageListProps) {
           onRespond={handleCheckpointRespond}
           isResponding={checkpointResponding}
         />
+      )}
+
+      {/* Smart mode: Orchestrator Indicator */}
+      {mode === 'smart' && orchestratorDecision && (
+        <OrchestratorIndicator decision={orchestratorDecision} roles={roles} />
+      )}
+
+      {/* Smart mode: Search Results */}
+      {mode === 'smart' && searchResults && searchResults.length > 0 && (
+        <SearchResultCard results={searchResults} />
       )}
     </div>
   );

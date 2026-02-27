@@ -6,10 +6,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { MessageSquare, PlusCircle, History, Settings, Brain, LogIn, LogOut, User } from 'lucide-react';
 import type { UserData } from '@/types';
 
-const navItems = [
+const baseNavItems = [
   { href: '/', label: '首页', icon: Brain },
   { href: '/new', label: '新建讨论', icon: PlusCircle },
   { href: '/history', label: '历史记录', icon: History },
+];
+
+const adminNavItems = [
   { href: '/settings', label: '设置', icon: Settings },
 ];
 
@@ -60,7 +63,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => {
+        {[...baseNavItems, ...(user?.isAdmin ? adminNavItems : [])].map((item) => {
           const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
           return (
             <Link

@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getAllProviders, isCustomProviderEntry } from '@/lib/llm/providers';
+import { getSession } from '@/lib/auth/session';
 
 export async function GET() {
   try {
+    // Admin check
+    const session = await getSession();
+    if (!session?.isAdmin) {
+      return NextResponse.json({ error: '无权访问设置页面' }, { status: 403 });
+    }
+
     let settings = await prisma.userSettings.findUnique({
       where: { id: 'default' },
     });
@@ -61,6 +68,12 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    // Admin check
+    const session = await getSession();
+    if (!session?.isAdmin) {
+      return NextResponse.json({ error: '无权修改设置' }, { status: 403 });
+    }
+
     const body = await request.json();
     const data: Record<string, unknown> = {};
 

@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Volume2 } from 'lucide-react';
 import { parseThinkTags, isInThinkBlock } from '@/lib/utils/think-parser';
 import { ThinkBlock } from './think-block';
 
@@ -14,6 +15,7 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
   isUser?: boolean;
   phaseName?: string | null;
+  onSpeak?: (text: string) => void;
 }
 
 export function MessageBubble({
@@ -25,6 +27,7 @@ export function MessageBubble({
   isStreaming,
   isUser,
   phaseName,
+  onSpeak,
 }: MessageBubbleProps) {
   const displayName = humanName || roleName;
 
@@ -71,9 +74,19 @@ export function MessageBubble({
           )}
         </div>
         <div
-          className="bg-card border border-border rounded-2xl rounded-tl-md px-3 md:px-4 py-2 md:py-3"
+          className="bg-card border border-border rounded-2xl rounded-tl-md px-3 md:px-4 py-2 md:py-3 relative group"
           style={{ borderTopColor: color + '40' }}
         >
+          {/* TTS speak button */}
+          {onSpeak && !isStreaming && content && (
+            <button
+              onClick={() => onSpeak(content)}
+              className="absolute top-2 right-2 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground hover:bg-muted"
+              title="朗读此条消息"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           <div className={`text-sm prose-message ${isStreaming ? 'streaming-cursor' : ''}`}>
             {streaming ? (
               <span className="text-muted-foreground">思考中...</span>

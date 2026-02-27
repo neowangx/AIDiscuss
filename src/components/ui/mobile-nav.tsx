@@ -6,10 +6,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { Brain, PlusCircle, History, Settings, LogIn, User } from 'lucide-react';
 import type { UserData } from '@/types';
 
-const navItems = [
+const baseNavItems = [
   { href: '/', label: '首页', icon: Brain },
   { href: '/new', label: '新建', icon: PlusCircle },
   { href: '/history', label: '历史', icon: History },
+];
+
+const adminNavItems = [
   { href: '/settings', label: '设置', icon: Settings },
 ];
 
@@ -37,7 +40,8 @@ export function MobileNav() {
   // Hide on discussion pages (they have their own controls)
   if (pathname.startsWith('/discussion/')) return null;
 
-  // Build items: replace settings with user/login if not logged in
+  // Build items: include settings only for admin, add user/login link
+  const navItems = [...baseNavItems, ...(user?.isAdmin ? adminNavItems : [])];
   const items = loaded && !user
     ? [
         ...navItems,
